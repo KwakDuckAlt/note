@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="ko"><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>단순 노트패드 (Simple Notepad)</title>
+  <style>
+    :root {
+      --bg-color: #f8f9fa;
+      --sidebar-bg: #ffffff;
+      --text-color: #212529;
+      --border-color: #dee2e6;
+      --active-item: #e9ecef;
+      --toolbar-bg: #f1f3f5;
+      --editor-bg: #ffffff;
+      --button-bg: #e9ecef;
+      --button-hover: #ced4da;
+      --danger-color: #fa5252;
+      --accent-color: #4c6ef5;
+    }
+
+    [data-theme="dark"] {
+      --bg-color: #121212;
+      --sidebar-bg: #1e1e1e;
+      --text-color: #e0e0e0;
+      --border-color: #333333;
+      --active-item: #2c2c2c;
+      --toolbar-bg: #252525;
+      --editor-bg: #1e1e1e;
+      --button-bg: #2c2c2c;
+      --button-hover: #3d3d3d;
+      --danger-color: #ff6b6b;
+      --accent-color: #748ffc;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      /* 한국어: 맑은 고딕, 영어: Times New Roman 지정 */
+      font-family: 'Times New Roman', 'Malgun Gothic', '맑은 고딕', sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    /* 사이드바 (노트 목록) */
+    .sidebar {
+      width: 280px;
+      background-color: var(--sidebar-bg);
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      transition: background-color 0.3s;
+      flex-shrink: 0;
+    }
+
+    .sidebar-header {
+      padding: 15px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .sidebar-header h2 {
+      font-size: 1.1rem;
+      font-weight: bold;
+    }
+
+    .btn-new-note {
+      background-color: var(--accent-color);
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+
+    .btn-new-note:hover {
+      opacity: 0.9;
+    }
+
+    .note-list {
+      flex: 1;
+      overflow-y: auto;
+      list-style: none;
+    }
+
+    .note-item {
+      padding: 12px 15px;
+      border-bottom: 1px solid var(--border-color);
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .note-item:hover {
+      background-color: var(--active-item);
+    }
+
+    .note-item.active {
+      background-color: var(--active-item);
+      border-left: 4px solid var(--accent-color);
+    }
+
+    .note-info {
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      flex: 1;
+    }
+
+    .note-title-preview {
+      font-weight: bold;
+      font-size: 0.95rem;
+      margin-bottom: 4px;
+    }
+
+    .note-date {
+      font-size: 0.75rem;
+      opacity: 0.6;
+    }
+
+    .btn-delete {
+      background: none;
+      border: none;
+      color: var(--danger-color);
+      cursor: pointer;
+      font-size: 1rem;
+      padding: 2px 6px;
+      margin-left: 8px;
+    }
+
+    /* 메인 에디터 영역 */
+    .main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* 툴바 */
+    .toolbar {
+      background-color: var(--toolbar-bg);
+      border-bottom: 1px solid var(--border-color);
+      padding: 10px 15px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .toolbar button, .toolbar select {
+      background-color: var(--button-bg);
+      color: var(--text-color);
+      border: 1px solid var(--border-color);
+      padding: 6px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.9rem;
+    }
+
+    .toolbar button:hover, .toolbar select:hover {
+      background-color: var(--button-hover);
+    }
+
+    .toolbar-separator {
+      width: 1px;
+      height: 20px;
+      background-color: var(--border-color);
+      margin: 0 4px;
+    }
+
+    .theme-toggle {
+      margin-left: auto;
+    }
+
+    .zoom-level-text {
+      font-size: 0.85rem;
+      min-width: 45px;
+      text-align: center;
+      font-weight: bold;
+    }
+
+    /* 노티파이어 */
+    .save-status {
+      font-size: 0.8rem;
+      opacity: 0.7;
+      margin-right: 5px;
+    }
+
+    /* 편집기 본문 (확대/축소 지원) */
+    .editor-wrapper {
+      flex: 1;
+      overflow: auto;
+      background-color: var(--editor-bg);
+    }
+
+    .editor-container {
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+      padding: 30px;
+      background-color: var(--editor-bg);
+      transform-origin: top left;
+      transition: transform 0.1s ease-out;
+    }
+
+    .note-title-input {
+      font-size: 1.5rem;
+      font-weight: bold;
+      border: none;
+      outline: none;
+      background: transparent;
+      color: var(--text-color);
+      margin-bottom: 15px;
+      font-family: inherit;
+      width: 100%;
+    }
+
+    .editor {
+      flex: 1;
+      outline: none;
+      border: none;
+      background: transparent;
+      color: var(--text-color);
+      font-family: inherit;
+      font-size: 16px; /* 기본 글자 크기 */
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+      min-height: 300px;
+      tab-size: 4;
+    }
+
+    /* 하단 상태바 (글자 수 계산) */
+    .statusbar {
+      background-color: var(--toolbar-bg);
+      border-top: 1px solid var(--border-color);
+      padding: 8px 15px;
+      font-size: 0.85rem;
+      display: flex;
+      gap: 20px;
+      opacity: 0.9;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 사이드바 -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h2>노트 목록</h2>
+      <button class="btn-new-note" id="btn-new">+ 새 노트</button>
+    </div>
+    <ul class="note-list" id="note-list"><li class="note-item active">
+          <div class="note-info">
+            <div class="note-title-preview">제목 없는 노트</div>
+            <div class="note-date">2026. 9. 27. 오후 8:04:32</div>
+          </div>
+          <button class="btn-delete" title="삭제">×</button>
+        </li></ul>
+  </div>
+
+  <!-- 메인 편집 영역 -->
+  <div class="main-content">
+    <!-- 서식 및 기능 툴바 -->
+    <div class="toolbar">
+      <!-- 텍스트 서식 -->
+      <button onclick="formatDoc('bold')" title="굵게"><b>B</b></button>
+      <button onclick="formatDoc('italic')" title="이탈릭"><i>I</i></button>
+      <button onclick="formatDoc('underline')" title="밑줄"><u>U</u></button>
+
+      <div class="toolbar-separator"></div>
+
+      <!-- 폰트 크기 조절 -->
+      <select id="select-font-size" title="글자 크기 변경">
+        <option value="12px">12px</option>
+        <option value="14px">14px</option>
+        <option value="16px" selected="">16px (기본)</option>
+        <option value="18px">18px</option>
+        <option value="20px">20px</option>
+        <option value="24px">24px</option>
+        <option value="28px">28px</option>
+        <option value="32px">32px</option>
+      </select>
+
+      <div class="toolbar-separator"></div>
+
+      <!-- 화면 확대 / 축소 -->
+      <button id="btn-zoom-out" title="화면 축소">🔍 -</button>
+      <span class="zoom-level-text" id="zoom-level-display">100%</span>
+      <button id="btn-zoom-in" title="화면 확대">🔍 +</button>
+      <button id="btn-zoom-reset" title="화면 원래대로">100%</button>
+
+      <div class="toolbar-separator"></div>
+
+      <button id="btn-download" title="텍스트 파일로 내려받기">💾 내려받기 (.txt)</button>
+      
+      <span class="save-status" id="save-status">저장 중...</span>
+      
+      <button class="theme-toggle" id="btn-theme">🌙 다크 모드</button>
+    </div>
+
+    <!-- 에디터 영역 -->
+    <div class="editor-wrapper">
+      <div class="editor-container" id="editor-container" style="transform: scale(1); width: 100%;">
+        <input type="text" class="note-title-input" id="note-title" placeholder="제목 없는 노트" spellcheck="false" autocomplete="off" autocorrect="off" capitalized="off">
+        <div class="editor" id="editor" contenteditable="true" spellcheck="false" autocomplete="off" autocorrect="off" capitalized="off" placeholder="내용을 입력하세요..." style="font-size: 20px;"><br></div>
+      </div>
+    </div>
+
+    <!-- 상태바 (글자 수/단어 수) -->
+    <div class="statusbar">
+      <span>공백 포함: <strong id="char-count-with-spaces">0</strong>자</span>
+      <span>공백 제외: <strong id="char-count-without-spaces">0</strong>자</span>
+      <span>단어 수: <strong id="word-count">0</strong>개</span>
+    </div>
+  </div>
+
+  <script>
+    // 상태 관리
+    let notes = JSON.parse(localStorage.getItem('simple_notepad_notes')) || [];
+    let currentNoteId = localStorage.getItem('simple_notepad_current_id') || null;
+    let isDarkMode = localStorage.getItem('simple_notepad_theme') === 'dark';
+    let currentZoom = parseFloat(localStorage.getItem('simple_notepad_zoom')) || 1.0;
+
+    // DOM 요소
+    const noteListEl = document.getElementById('note-list');
+    const titleInput = document.getElementById('note-title');
+    const editorEl = document.getElementById('editor');
+    const editorContainer = document.getElementById('editor-container');
+    const btnNew = document.getElementById('btn-new');
+    const btnDownload = document.getElementById('btn-download');
+    const btnTheme = document.getElementById('btn-theme');
+    const saveStatusEl = document.getElementById('save-status');
+    const selectFontSize = document.getElementById('select-font-size');
+
+    const btnZoomIn = document.getElementById('btn-zoom-in');
+    const btnZoomOut = document.getElementById('btn-zoom-out');
+    const btnZoomReset = document.getElementById('btn-zoom-reset');
+    const zoomLevelDisplay = document.getElementById('zoom-level-display');
+
+    const charWithSpacesEl = document.getElementById('char-count-with-spaces');
+    const charWithoutSpacesEl = document.getElementById('char-count-without-spaces');
+    const wordCountEl = document.getElementById('word-count');
+
+    // 초기화
+    function init() {
+      // 테마 설정
+      if (isDarkMode) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        btnTheme.textContent = '☀️ 브라이트 모드';
+      }
+
+      // 화면 배율 초기화
+      applyZoom(currentZoom);
+
+      // 데이터가 없으면 새 노트 생성
+      if (notes.length === 0) {
+        createNewNote();
+      } else {
+        if (!currentNoteId || !notes.find(n => n.id === currentNoteId)) {
+          currentNoteId = notes[0].id;
+        }
+        renderNoteList();
+        loadNote(currentNoteId);
+      }
+
+      updateStats();
+    }
+
+    // 텍스트 서식 적용 함수
+    function formatDoc(cmd) {
+      document.execCommand(cmd, false, null);
+      editorEl.focus();
+      triggerAutoSave();
+    }
+
+    // 새 노트 생성
+    function createNewNote() {
+      const newNote = {
+        id: Date.now().toString(),
+        title: '',
+        content: '',
+        fontSize: '16px',
+        updatedAt: new Date().toLocaleString('ko-KR')
+      };
+      notes.unshift(newNote);
+      currentNoteId = newNote.id;
+      saveToLocalStorage();
+      renderNoteList();
+      loadNote(currentNoteId);
+    }
+
+    // 노트 로드
+    function loadNote(id) {
+      currentNoteId = id;
+      localStorage.setItem('simple_notepad_current_id', currentNoteId);
+      const note = notes.find(n => n.id === id);
+      if (note) {
+        titleInput.value = note.title;
+        editorEl.innerHTML = note.content;
+        
+        // 글자 크기 복원
+        const fontSize = note.fontSize || '16px';
+        editorEl.style.fontSize = fontSize;
+        selectFontSize.value = fontSize;
+
+        updateActiveSidebarItem();
+        updateStats();
+      }
+    }
+
+    // 노트 삭제
+    function deleteNote(id, e) {
+      e.stopPropagation();
+      if (confirm('이 노트를 삭제하시겠습니까?')) {
+        notes = notes.filter(n => n.id !== id);
+        saveToLocalStorage();
+        if (notes.length === 0) {
+          createNewNote();
+        } else {
+          if (currentNoteId === id) {
+            currentNoteId = notes[0].id;
+          }
+          renderNoteList();
+          loadNote(currentNoteId);
+        }
+      }
+    }
+
+    // 노트 목록 렌더링
+    function renderNoteList() {
+      noteListEl.innerHTML = '';
+      notes.forEach(note => {
+        const li = document.createElement('li');
+        li.className = `note-item ${note.id === currentNoteId ? 'active' : ''}`;
+        li.onclick = () => loadNote(note.id);
+
+        const titleText = note.title.trim() || '제목 없는 노트';
+        
+        li.innerHTML = `
+          <div class="note-info">
+            <div class="note-title-preview">${escapeHtml(titleText)}</div>
+            <div class="note-date">${note.updatedAt}</div>
+          </div>
+          <button class="btn-delete" title="삭제">&times;</button>
+        `;
+
+        li.querySelector('.btn-delete').onclick = (e) => deleteNote(note.id, e);
+        noteListEl.appendChild(li);
+      });
+    }
+
+    function updateActiveSidebarItem() {
+      document.querySelectorAll('.note-item').forEach(item => {
+        item.classList.remove('active');
+      });
+      renderNoteList();
+    }
+
+    // 자동 저장 처리 (디바운스 적용)
+    let saveTimeout;
+    function triggerAutoSave() {
+      saveStatusEl.textContent = '저장 중...';
+      clearTimeout(saveTimeout);
+      saveTimeout = setTimeout(() => {
+        saveCurrentNote();
+      }, 300);
+    }
+
+    function saveCurrentNote() {
+      const note = notes.find(n => n.id === currentNoteId);
+      if (note) {
+        note.title = titleInput.value;
+        note.content = editorEl.innerHTML;
+        note.fontSize = editorEl.style.fontSize || '16px';
+        note.updatedAt = new Date().toLocaleString('ko-KR');
+        
+        notes = [note, ...notes.filter(n => n.id !== currentNoteId)];
+        
+        saveToLocalStorage();
+        renderNoteList();
+        saveStatusEl.textContent = '자동 저장됨';
+      }
+    }
+
+    function saveToLocalStorage() {
+      localStorage.setItem('simple_notepad_notes', JSON.stringify(notes));
+      localStorage.setItem('simple_notepad_current_id', currentNoteId);
+    }
+
+    // 글자 수 및 단어 수 세기
+    function updateStats() {
+      const text = editorEl.innerText || '';
+      
+      const charWithSpaces = text.replace(/\n/g, '').length;
+      const charWithoutSpaces = text.replace(/\s/g, '').length;
+      
+      const trimmedText = text.trim();
+      const wordCount = trimmedText === '' ? 0 : trimmedText.split(/\s+/).length;
+
+      charWithSpacesEl.textContent = charWithSpaces.toLocaleString();
+      charWithoutSpacesEl.textContent = charWithoutSpaces.toLocaleString();
+      wordCountEl.textContent = wordCount.toLocaleString();
+    }
+
+    // 파일로 내려받기 (.txt)
+    function downloadNote() {
+      const title = titleInput.value.trim() || '제목 없는 노트';
+      const textContent = editorEl.innerText;
+
+      const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `${title}.txt`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+    }
+
+    // 1. 글자 크기 변경
+    selectFontSize.addEventListener('change', (e) => {
+      const size = e.target.value;
+      editorEl.style.fontSize = size;
+      triggerAutoSave();
+    });
+
+    // 2. 화면 확대/축소 기능
+    function applyZoom(zoom) {
+      currentZoom = Math.min(Math.max(zoom, 0.5), 2.5); // 50% ~ 250% 범위 제한
+      editorContainer.style.transform = `scale(${currentZoom})`;
+      editorContainer.style.width = `${100 / currentZoom}%`;
+      zoomLevelDisplay.textContent = `${Math.round(currentZoom * 100)}%`;
+      localStorage.setItem('simple_notepad_zoom', currentZoom);
+    }
+
+    btnZoomIn.addEventListener('click', () => applyZoom(currentZoom + 0.1));
+    btnZoomOut.addEventListener('click', () => applyZoom(currentZoom - 0.1));
+    btnZoomReset.addEventListener('click', () => applyZoom(1.0));
+
+    // 3. Tab 키로 큰 여백(공백 4칸) 삽입 기능
+    editorEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Tab') {
+        e.preventDefault(); // 다음 포커스로 이동하는 기본 동작 방지
+
+        // document.execCommand를 활용하여 커서 위치에 공백 4칸 삽입 및 Undo/Redo 지원
+        document.execCommand('insertText', false, '    ');
+        triggerAutoSave();
+        updateStats();
+      }
+    });
+
+    // 이벤트 리스너 등록
+    titleInput.addEventListener('input', triggerAutoSave);
+    editorEl.addEventListener('input', () => {
+      triggerAutoSave();
+      updateStats();
+    });
+
+    btnNew.addEventListener('click', createNewNote);
+    btnDownload.addEventListener('click', downloadNote);
+
+    // 테마 전환
+    btnTheme.addEventListener('click', () => {
+      isDarkMode = !isDarkMode;
+      if (isDarkMode) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        btnTheme.textContent = '☀️ 브라이트 모드';
+        localStorage.setItem('simple_notepad_theme', 'dark');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+        btnTheme.textContent = '🌙 다크 모드';
+        localStorage.setItem('simple_notepad_theme', 'light');
+      }
+    });
+
+    // 시작 실행
+    init();
+  </script>
+
+</body></html>
